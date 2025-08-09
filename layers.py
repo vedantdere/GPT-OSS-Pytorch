@@ -286,8 +286,8 @@ class GptOssAttention(nn.Module):
                 hidden_state,
                 position_embeddings,
                 attention_mask,
-                past_key_values,
-                cache_position,
+                past_key_values=None,
+                cache_position=None,
                 **kwargs):
         
         input_shape = hidden_state.shape[:-1]
@@ -298,11 +298,11 @@ class GptOssAttention(nn.Module):
         value_states = self.v_proj(hidden_state).view(hidden_shape).transpose(1,2)
 
         cos,sin = position_embeddings
-        query_states , key_state = apply_rotart_pos_emb(query_states,key_state,cos,sin)
+        query_states , key_states = apply_rotart_pos_emb(query_states,key_states,cos,sin)
 
-        if past_key_values is not None:
-            cache_kwargs = {"cache_position":cache_position}
-            key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
+        # if past_key_values is not None:
+        #     cache_kwargs = {"cache_position":cache_position}
+        #     key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
 
         attention_inference: Callable = eager_attention_forward
         if self.config._attn_implementation != "eager":
