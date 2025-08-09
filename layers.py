@@ -247,32 +247,33 @@ class GptOssAttention(nn.Module):
         self.layer_idx = layer_idx
         
         self.head_dim = getattr(config,"head_dim",config.hidden_size//config.num_attention_heads)
-        self.num_key_value_groups = config.num_attention_heads // self.num_key_value_groups
+        print(self.config)
+        self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim*-0.5
 
         self.attention_dropout = config.attention_dropout
         self.is_casual = True
 
-        self.q_proj = nn.linear(
+        self.q_proj = nn.Linear(
             config.hidden_size,
             config.num_attention_heads * self.head_dim,
             bias = config.attention_bias
         )
 
-        self.k_proj = nn.linear(
+        self.k_proj = nn.Linear(
             config.hidden_size,
             config.num_attention_heads * self.head_dim,
             bias = config.attention_bias
         )
 
-        self.v_proj = nn.linear(
+        self.v_proj = nn.Linear(
             config.hidden_size,
             config.num_attention_heads * self.head_dim,
             bias = config.attention_bias
         )
 
         self.o_proj = nn.Linear(
-            self.num_attention_heads * self.head_dim,
+            config.num_attention_heads * self.head_dim,
             config.hidden_size,
             bias=config.attention_bias
         )
@@ -281,48 +282,48 @@ class GptOssAttention(nn.Module):
         self.sinks = nn.Parameter(torch.empty(config.num_attention_heads))
 
 
-def forward(self,
-            hidden_state,
-            position_embeddings,
+    def forward(self,
+                hidden_state,
+                position_embeddings,
+                attention_mask,
+                past_key_values,
+                cache_position,
+                **kwargs):
+        
+        input_shape = hidden_state.shape[:-1]
+        hidden_shape = (*input_shape,-1,self.head_dim)
+
+        query_states = self.q_proj(hidden_state).view(hidden_shape).transpose(1,2)
+        key_states = self.k_proj(hidden_state).view(hidden_shape).transpose(1,2)
+        value_states = self.v_proj(hidden_state).view(hidden_shape).transpose(1,2)
+
+        cos,sin = position_embeddings
+        query_states , key_state = apply_rotart_pos_emb(query_states,key_state,cos,sin)
+
+        if past_key_values is not None:
+            cache_kwargs = {"cache_position":cache_position}
+            key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
+
+        attention_inference: Callable = eager_attention_forward
+        if self.config._attn_implementation != "eager":
+            # attention_inference = ALL_ATTENTION_FUNCTION[self.config._attn_implementation]
+            attention_inference = eager_paged_attention_forward
+
+        attn_output,attn_weights = attention_inference(
+            self,
+            query_states,
+            key_states,
+            value_states,
             attention_mask,
-            past_key_values,
-            cache_position,
-            **kwargs):
-    
-    input_shape = hidden_state.shape[:-1]
-    hidden_shape = (*input_shape,-1,self.head_dim)
-
-    query_states = self.q_proj(hidden_state).view(hidden_shape).transpose(1,2)
-    key_states = self.k_proj(hidden_state).view(hidden_shape).transpose(1,2)
-    value_states = self.v_proj(hidden_state).view(hidden_shape).transpose(1,2)
-
-    cos,sin = position_embeddings
-    query_states , key_state = apply_rotart_pos_emb(query_states,key_state,cos,sin)
-
-    if past_key_values is not None:
-        cache_kwargs = {"cache_position":cache_position}
-        key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
-
-    attention_inference: Callable = eager_attention_forward
-    if self.config._attn_implementation != "eager":
-        # attention_inference = ALL_ATTENTION_FUNCTION[self.config._attn_implementation]
-        attention_inference = eager_paged_attention_forward
-
-    attn_output,attn_weights = attention_inference(
-        self,
-        query_states,
-        key_states,
-        value_states,
-        attention_mask,
-        dropout=0.0 if not self.training else self.attention_dropout,
-        scaling=self.scaling,
-        sliding_window = self.sliding_attention,
-        s_aux=self.sinks,
-        **kwargs
-    )
-    attn_output = attn_output.reshape(*input_shape,-1).contiguous()
-    attn_output = self.o_proj(attn_output)
-    return attn_output,attn_weights
+            dropout=0.0 if not self.training else self.attention_dropout,
+            scaling=self.scaling,
+            sliding_window = self.sliding_attention,
+            s_aux=self.sinks,
+            **kwargs
+        )
+        attn_output = attn_output.reshape(*input_shape,-1).contiguous()
+        attn_output = self.o_proj(attn_output)
+        return attn_output,attn_weights
 
 
 class GptOssDecoderLayer(nn.Module):
