@@ -305,9 +305,9 @@ class GptOssAttention(nn.Module):
         #     key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
 
         attention_inference: Callable = eager_attention_forward
-        if self.config._attn_implementation != "eager":
-            # attention_inference = ALL_ATTENTION_FUNCTION[self.config._attn_implementation]
-            attention_inference = eager_paged_attention_forward
+        # if self.config._attn_implementation != "eager":
+        #     # attention_inference = ALL_ATTENTION_FUNCTION[self.config._attn_implementation]
+        attention_inference = eager_paged_attention_forward
 
         attn_output,attn_weights = attention_inference(
             self,
@@ -317,7 +317,7 @@ class GptOssAttention(nn.Module):
             attention_mask,
             dropout=0.0 if not self.training else self.attention_dropout,
             scaling=self.scaling,
-            sliding_window = self.sliding_attention,
+            sliding_window = self.sliding_window,
             s_aux=self.sinks,
             **kwargs
         )
