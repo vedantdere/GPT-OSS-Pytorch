@@ -568,7 +568,7 @@ def load_balancing_loss_func(
     return overall_loss * num_experts
 
 
-class GptOssforCausalLM(GptOssPreTrainedModel):
+class GptOssForCausalLM(GptOssPreTrainedModel,GenerationMixin):
     def __init__(self,
                  config):
         super().__init__()
