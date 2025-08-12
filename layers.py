@@ -378,7 +378,7 @@ class GptOssDecoderLayer(nn.Module):
         hidden_states = residual + hidden_states
         return hidden_states
 
-class GptOssPreTrainedModel(PreTrainedModel):
+class GptOssPreTrainedModel(nn.Module):
     config: GptOssConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
@@ -428,7 +428,7 @@ class GptOssPreTrainedModel(PreTrainedModel):
             module.bias.data.zero_()
     
 
-class GptOssModel(GptOssPreTrainedModel):
+class GptOssModel(nn.Module):
     def __init__(self,
                 config):
         super().__init__(config)
