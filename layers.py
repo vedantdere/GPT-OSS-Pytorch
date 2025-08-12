@@ -431,7 +431,7 @@ class GptOssPreTrainedModel(nn.Module):
 class GptOssModel(nn.Module):
     def __init__(self,
                 config):
-        super().__init__(config)
+        super().__init__()
 
         self.padding_idx = config.padding_idx
         self.vocab_size = config.vocab_size
