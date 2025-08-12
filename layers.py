@@ -378,8 +378,57 @@ class GptOssDecoderLayer(nn.Module):
         hidden_states = residual + hidden_states
         return hidden_states
 
+class GptOssPreTrainedModel(PreTrainedModel):
+    config: GptOssConfig
+    base_model_prefix = "model"
+    supports_gradient_checkpointing = True
+    _no_split_modules = ["GptOssDecoderLayer"]
+    _skip_keys_device_placement=['past_key_values']
+    _supports_flash_attn=True
+    _supports_sdpa=False
+    _supports_flex_attn=True
 
-class GptOssModel(nn.Module):
+    _can_compile_fullgraph=True
+    _supports_attention_backend=True
+    _can_record_outputs = {
+        "router_logits":OutputRecorder(GPTOssTopKRouter,index=0),
+        "hidden_states":GptOssDecoderLayer,
+        "attentions":GptOssAttention,
+    }
+
+    _keep_in_fp32_modules=["post_attention_layernorm","input_layernorm","norm"]
+    _supports_flask_attention=False
+    _supports_flex_attention=False
+
+
+    def _init_weights(self,module):
+        std = self.config.initializer_range
+        if isinstance(module, nn.Linear):
+            module.weight.data.normal_(mean=0.0,std=std)
+            if module.bias is not None:
+                module.bias.data.zero_()
+        elif isinstance(module,nn.Parameter):
+            module.data.normal_(mean=0.0,std=std)
+        elif isinstance(module,nn.Embedding):
+            module.weight.data.normal_(mean=0.0,std=std)
+            if module.padding_idx is not None:
+                module.weight.data[module.padding_idx].zero_()
+        elif isinstance(module,GptOssRMSNorm):
+            module.weights.data.fill_(1.0)
+        elif isinstance(module,GPTOssExperts):
+            module.gate_up_proj.data.normal_(mean=0.0,std=std)
+            module.gate_up_proj_bias.data.zero_()
+            module.down_proj.data.normal_(mean=0.0,std=std)
+            module.down_proj_bias.data.zero_()
+
+        elif isinstance(module,GptOssAttention):
+            module.sinks.data.normal_(mean=0.0,std=std)
+        elif isinstance(module,GPTOssTopKRouter):
+            module.weight.data.normal_(mean=0.0,std=std)
+            module.bias.data.zero_()
+    
+
+class GptOssModel(GptOssPreTrainedModel):
     def __init__(self,
                 config):
         super().__init__()
@@ -436,56 +485,6 @@ class GptOssModel(nn.Module):
             past_key_values=past_key_values
         )
     
-class GptOssPreTrainedModel(PreTrainedModel):
-    config: GptOssConfig
-    base_model_prefix = "model"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["GptOssDecoderLayer"]
-    _skip_keys_device_placement=['past_key_values']
-    _supports_flash_attn=True
-    _supports_sdpa=False
-    _supports_flex_attn=True
-
-    _can_compile_fullgraph=True
-    _supports_attention_backend=True
-    _can_record_outputs = {
-        "router_logits":OutputRecorder(GPTOssTopKRouter,index=0),
-        "hidden_states":GptOssDecoderLayer,
-        "attentions":GptOssAttention,
-    }
-
-    _keep_in_fp32_modules=["post_attention_layernorm","input_layernorm","norm"]
-    _supports_flask_attention=False
-    _supports_flex_attention=False
-
-
-    def _init_weights(self,module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0,std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module,nn.Parameter):
-            module.data.normal_(mean=0.0,std=std)
-        elif isinstance(module,nn.Embedding):
-            module.weight.data.normal_(mean=0.0,std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-        elif isinstance(module,GptOssRMSNorm):
-            module.weights.data.fill_(1.0)
-        elif isinstance(module,GPTOssExperts):
-            module.gate_up_proj.data.normal_(mean=0.0,std=std)
-            module.gate_up_proj_bias.data.zero_()
-            module.down_proj.data.normal_(mean=0.0,std=std)
-            module.down_proj_bias.data.zero_()
-
-        elif isinstance(module,GptOssAttention):
-            module.sinks.data.normal_(mean=0.0,std=std)
-        elif isinstance(module,GPTOssTopKRouter):
-            module.weight.data.normal_(mean=0.0,std=std)
-            module.bias.data.zero_()
-    
-
 def load_balancing_loss_func(
     gate_logits: Union[torch.Tensor, tuple[torch.Tensor], None],
     num_experts: Optional[int] = None,
