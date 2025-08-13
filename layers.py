@@ -167,12 +167,12 @@ class GptOssRotartEmbedding(nn.Module):
 
         inv_freq,self.attenstion_scaling = self.rope_init_fn(self.config,device)
 
-        self.register_buffer("inv_freq",inv_freq,presistent=False)
+        self.register_buffer("inv_freq",inv_freq)
         self.original_inv_freq = self.inv_freq
 
     @torch.no_grad()
     def forward(self,x,position_ids):
-        inv_freq_expanded = self.inv_freq[None,:,None].float().expant(position_ids.shape[0],-1,1).to(x.device)
+        inv_freq_expanded = self.inv_freq[None,:,None].float().expand(position_ids.shape[0],-1,1).to(x.device)
         postion_ids_expanded = position_ids[:,None,:].float()
 
         device_type = x.device.type if isinstance(x.device.type,str) and x.device.type != "mps" else "cpu"
@@ -433,7 +433,7 @@ class GptOssModel(nn.Module):
                 config):
         super().__init__()
 
-        self.padding_idx = config.padding_idx
+        self.padding_idx = 0 #config.padding_idx
         self.vocab_size = config.vocab_size
 
         self.embed_tokens = nn.Embedding(config.vocab_size,config.hidden_size,self.padding_idx)
@@ -450,7 +450,7 @@ class GptOssModel(nn.Module):
                 position_ids=None,
                 past_key_values=None,
                 inputs_embeds=None,
-                use_cahce=None,
+                use_cache=None,
                 cache_position=None,
                 **kwargs):
         if inputs_embeds is None:
@@ -474,7 +474,7 @@ class GptOssModel(nn.Module):
                 attention_mask=attention_mask,
                 position_ids=position_ids,
                 past_key_values=past_key_values,
-                use_cache=use_cahce,
+                use_cache=use_cache,
                 cache_position=cache_position,
                 position_embeddings=position_embeddings,
                 **kwargs
