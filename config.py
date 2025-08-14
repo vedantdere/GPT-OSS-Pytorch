@@ -1,6 +1,4 @@
-from transformers.configuration_utils import PretrainedConfig, layer_type_validation
-
-class PretrainedConfig(PretrainedConfig):
+class PretrainedConfig:
     model_type=""
     base_config_key=""
     sub_configs={}
@@ -48,7 +46,7 @@ class PretrainedConfig(PretrainedConfig):
         
 
 
-class Config:
+class Config(PretrainedConfig):
     def __init__(self,
                  num_hidden_layers=36,
                  num_local_experts=128,
