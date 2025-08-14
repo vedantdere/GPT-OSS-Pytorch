@@ -639,3 +639,50 @@ class GptOssForCausalLM(GptOssPreTrainedModel,GenerationMixin):
             attentions=outputs.attentions,
             router_logits=outputs.router_logits
         )
+    
+
+class GPTOssModelFull(nn.Module):
+    def __init__(self,
+                 config):
+        super().__init__()
+
+        self.model = GptOssModel(config)
+        self.vocab_size = config.vocab_size
+        self.lm_head = nn.Linear(config.hidden_size,config.vocab_size,bias=False)
+        self.router_aux_loss_coef = config.router_aux_loss_coef
+        self.num_experts = config.num_local_experts
+        self.num_experts_per_tok = config.num_experts_per_tok
+        self.config = config
+
+    def forward(self,
+                input_ids=None,
+                attention_mask=None,
+                position_ids=None,
+                past_key_values=None,
+                input_embeds=None,
+                labels=None,
+                use_cache=None,
+                output_router_logits=None,
+                cache_position=None,
+                logits_to_keep=None,
+                **kwargs):
+        output_router_logits = (
+            output_router_logits if output_router_logits is not None else self.config.output_router_logits
+        )
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            position_ids=position_ids,
+            past_key_values=past_key_values,
+            input_embeds=input_embeds,
+            use_cache=use_cache,
+            output_router_logits=output_router_logits,
+            cache_position=cache_position,
+            **kwargs
+        )
+
+        hidden_states = outputs.last_hidden_state
+
+        slice_indices = slice(-logits_to_keep,None) if isinstance(logits_to_keep,int) else logits_to_keep
+        logits = self.lm_head(hidden_states[:,slice_indices,:])
+        return logits
