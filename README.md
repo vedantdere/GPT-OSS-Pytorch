@@ -5,6 +5,12 @@
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python" />
 </p>
 
+<p align="center">
+    <img src="./assets/img1.png">
+    (img credit ChatGPT)
+</p>
+
+
 **GPT-OSS**, built entirely in **PyTorch** — a beginner-friendly implementation designed to enhance model understanding for future AI researchers. 
 
 Without Inheriting from anything other than `nn.Module` 😁
@@ -109,7 +115,11 @@ for step in range(100):
 ---
 
 ## 🙏 Credits
-* Special thanks to the Hugging Face Transformers team for their exceptional open-source work. This Reimplementation is primarily inspired by Hugging Face Transformers integration but presented in a much simpler, more beginner-friendly way for easier understanding.
+Special thanks to the Hugging Face Transformers team for their exceptional open-source work. This Reimplementation is primarily inspired by Hugging Face Transformers integration but presented in a much simpler, more beginner-friendly way for easier understanding.
+
+## 🙌 Inspiration
+
+This work draws significant inspiration from Andrej Karpathy’s minGPT.
 
 
 ---

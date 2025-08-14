@@ -1,27 +1,12 @@
-from typing import Callable,Optional,Union
+from torch import nn # Very Important in Deep Learning :)
 import torch
-from torch import nn
 from torch.nn import functional as F
+from typing import Callable
 from attn_implementation import eager_paged_attention_forward
-from transformers.generation.utils import GenerationMixin
-from transformers.modeling_outputs import MoeCausalLMOutputWithPast,MoeModelOutputWithPast
+from transformers.modeling_outputs import MoeModelOutputWithPast # Handles the models output. 
 from gpt_config import GptOssConfig
-from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS
-from transformers.modeling_utils import PreTrainedModel
-from transformers.utils.generic import OutputRecorder
+from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS # We are plaining to create separate pure pytorch implementation for rope 
 
-class RMSNorm(nn.Module):
-    def __init__(self,
-                dim,
-                eps=1e-8):
-        super().__init__()
-
-        self.eps = eps
-        self.weight = nn.Parameter(torch.ones(dim))
-
-    def forward(self,x):
-        rms = torch.sqrt(torch.mean(x**2,dim=1,keepdim=True)+self.eps)
-        return self.weight*(x/rms)
 
 class GptOssRMSNorm(nn.Module):
     def __init__(self,
@@ -33,6 +18,14 @@ class GptOssRMSNorm(nn.Module):
         self.weight = nn.Parameter(torch.ones(dim))
 
     def forward(self,x):
+        """
+        Apply RMS Normalization to the input tensor x.
+        Args:
+            x (torch.Tensor): Input tensor to be normalized.
+            shape of x should be (batch_size, sequence_length, hidden_size).
+        Returns:
+            torch.Tensor: Normalized tensor.
+        """
         variance = x.pow(2).mean(-1,keepdim=True)
         x = x * torch.sqrt(variance + self.eps)
         x = self.weight * x
@@ -61,6 +54,15 @@ class GPTOssExperts(nn.Module):
                 hidden_state,
                 router_indices,
                 routing_weights):
+        """"
+        Apply the experts to the hidden state based on the routing indices and weights.
+        Args:
+            hidden_state (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+            router_indices (torch.Tensor): Indices of the experts to route to, shape (batch_size, num_experts).
+            routing_weights (torch.Tensor): Weights for the routing, shape (batch_size, num_experts).
+        Returns:
+            torch.Tensor: Output tensor after applying the experts, shape (batch_size, sequence_length, hidden_size).
+        """
         
         batch_size = hidden_state.shape[0]
         hidden_state = hidden_state.view(-1,self.hidden_size)
@@ -125,6 +127,14 @@ class GPTOssTopKRouter(nn.Module):
         self.bias = nn.Parameter(torch.empty(self.num_experts))
 
     def forward(self,hidden_state):
+        """"
+        Apply the top-k routing to the hidden state.
+        Args:
+            hidden_state (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+        Returns:
+            torch.Tensor: Router scores of shape (batch_size, sequence_length, num_experts).
+            torch.Tensor: Indices of the top-k experts for each token, shape (batch_size, sequence_length, top_k).
+        """
         hidden_state = hidden_state.reshape(-1,self.hidden_dim)
         router_logits = F.linear(hidden_state,self.weight,self.bias)
 
@@ -144,6 +154,14 @@ class GptOssMLP(nn.Module):
         self.experts = GPTOssExperts(config)
 
     def forward(self,hidden_states):
+        """
+        Apply the MLP layer with routing to the hidden states.
+        Args:
+            hidden_states (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+        Returns:
+            torch.Tensor: Output tensor after applying the MLP layer, shape (batch_size, sequence_length, hidden_size).
+            torch.Tensor: Router scores of shape (batch_size, sequence_length, num_experts).
+        """
         router_scores,router_indices = self.router(hidden_states)
         routed_out = self.experts(hidden_states,router_indices=router_indices,routing_weights=router_scores)
         return routed_out,router_scores
@@ -172,6 +190,14 @@ class GptOssRotartEmbedding(nn.Module):
 
     @torch.no_grad()
     def forward(self,x,position_ids):
+        """"
+        Apply Rotary Position Embeddings to the input tensor x based on position_ids.
+        Args:
+            x (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+            position_ids (torch.Tensor): Position IDs of shape (batch_size, sequence_length).
+        Returns:
+            torch.Tensor: Cosine and sine embeddings for the rotary position embeddings.
+        """
         inv_freq_expanded = self.inv_freq[None,:,None].float().expand(position_ids.shape[0],-1,1).to(x.device)
         postion_ids_expanded = position_ids[:,None,:].float()
 
@@ -184,14 +210,6 @@ class GptOssRotartEmbedding(nn.Module):
             sin = emb.sin() * self.attenstion_scaling
 
         return cos.to(x.dtype),sin.to(x.dtype)
-
-
-def repeat_kv(hidden_state,n_rep):
-    batch,num_key_value_heads,slen,head_dim = hidden_state.shape
-    if n_rep == 1:
-        return hidden_state
-    hidden_state = hidden_state[:,:,None,:,:].expand(batch,num_key_value_heads,n_rep,slen,head_dim)
-    return hidden_state.reshape(batch,num_key_value_heads*n_rep,slen,head_dim)
 
 
 def _apply_rotary_emb(x,
@@ -211,35 +229,7 @@ def apply_rotart_pos_emb(q,k,cos,sin,position_ids=None,unsqueeze_dim=1):
     k_embed = _apply_rotary_emb(k,cos,sin)
     return q_embed,k_embed
 
-def eager_attention_forward(
-    module,
-    query,
-    key,
-    value,
-    attention_mask,
-    scaling,
-    dropout=0.0,
-    **kwargs
-):
-    key_state = repeat_kv(key,module.num_key_value_groups)
-    value_states = repeat_kv(value,module.num_key_value_groups)
-    attn_weights = torch.matmul(query,key_state.transpose(2,3)) * scaling
 
-    if attention_mask is not None:
-        casual_mask = attention_mask[:,:,:,:key_state.shape[-2]]
-        attn_weights = attn_weights + casual_mask
-    
-    sinks = module.sinks.reshape(1,-1,1,1).expand(query.shape[0],-1,query.shape[-2],-1)
-    combined_logits = torch.cat([attn_weights,sinks],dim=-1)
-
-    combined_logits = combined_logits - combined_logits.max(dim=-1,keepdim=True).value_states
-    probs = F.softmax(combined_logits,dim=-1,dtype=combined_logits.dtype)
-
-    scores = probs[...,:-1]
-    attn_weights = nn.functional.dropout(scores,p=dropout,training=module.training)
-    attn_output = torch.matmul(attn_weights,value_states)
-    attn_output = attn_output.transpose(1,2).contiguous()
-    return attn_output,attn_weights
 
 class GptOssAttention(nn.Module):
     def __init__(
@@ -295,6 +285,19 @@ class GptOssAttention(nn.Module):
                 past_key_values=None,
                 cache_position=None,
                 **kwargs):
+        
+        """"
+        Apply the attention mechanism to the hidden state.
+        Args:
+            hidden_state (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+            position_embeddings (tuple): Cosine and sine embeddings for the rotary position embeddings.
+            attention_mask (torch.Tensor): Attention mask of shape (batch_size, 1, sequence_length, sequence_length).
+            past_key_values (Optional): Past key values for caching.
+            cache_position (Optional): Position in the cache for the current sequence.
+        Returns:
+            torch.Tensor: Output tensor after applying the attention mechanism, shape (batch_size, sequence_length, hidden_size).
+            torch.Tensor: Attention weights of shape (batch_size, num_attention_heads, sequence_length, sequence_length).
+        """
         
         input_shape = hidden_state.shape[:-1]
         hidden_shape = (*input_shape,-1,self.head_dim)
@@ -355,7 +358,20 @@ class GptOssDecoderLayer(nn.Module):
                 cache_position,
                 position_embeddings,
                 **kwargs):
-        
+        """
+        Apply the decoder layer to the hidden states.
+        Args:
+            hidden_states (torch.Tensor): Input tensor of shape (batch_size, sequence_length, hidden_size).
+            attention_mask (torch.Tensor): Attention mask of shape (batch_size, 1, sequence_length, sequence_length).
+            position_ids (torch.Tensor): Position IDs of shape (batch_size, sequence_length).
+            past_key_values (Optional): Past key values for caching.
+            use_cache (bool): Whether to use caching for faster inference.
+            cache_position (Optional): Position in the cache for the current sequence.
+            position_embeddings (tuple): Cosine and sine embeddings for the rotary position embeddings.
+        Returns:
+            torch.Tensor: Output tensor after applying the decoder layer, shape (batch_size, sequence_length, hidden_size).
+        """
+
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
 
@@ -378,55 +394,6 @@ class GptOssDecoderLayer(nn.Module):
         hidden_states = residual + hidden_states
         return hidden_states
 
-class GptOssPreTrainedModel(nn.Module):
-    config: GptOssConfig
-    base_model_prefix = "model"
-    supports_gradient_checkpointing = True
-    _no_split_modules = ["GptOssDecoderLayer"]
-    _skip_keys_device_placement=['past_key_values']
-    _supports_flash_attn=True
-    _supports_sdpa=False
-    _supports_flex_attn=True
-
-    _can_compile_fullgraph=True
-    _supports_attention_backend=True
-    _can_record_outputs = {
-        "router_logits":OutputRecorder(GPTOssTopKRouter,index=0),
-        "hidden_states":GptOssDecoderLayer,
-        "attentions":GptOssAttention,
-    }
-
-    _keep_in_fp32_modules=["post_attention_layernorm","input_layernorm","norm"]
-    _supports_flask_attention=False
-    _supports_flex_attention=False
-
-
-    def _init_weights(self,module):
-        std = self.config.initializer_range
-        if isinstance(module, nn.Linear):
-            module.weight.data.normal_(mean=0.0,std=std)
-            if module.bias is not None:
-                module.bias.data.zero_()
-        elif isinstance(module,nn.Parameter):
-            module.data.normal_(mean=0.0,std=std)
-        elif isinstance(module,nn.Embedding):
-            module.weight.data.normal_(mean=0.0,std=std)
-            if module.padding_idx is not None:
-                module.weight.data[module.padding_idx].zero_()
-        elif isinstance(module,GptOssRMSNorm):
-            module.weights.data.fill_(1.0)
-        elif isinstance(module,GPTOssExperts):
-            module.gate_up_proj.data.normal_(mean=0.0,std=std)
-            module.gate_up_proj_bias.data.zero_()
-            module.down_proj.data.normal_(mean=0.0,std=std)
-            module.down_proj_bias.data.zero_()
-
-        elif isinstance(module,GptOssAttention):
-            module.sinks.data.normal_(mean=0.0,std=std)
-        elif isinstance(module,GPTOssTopKRouter):
-            module.weight.data.normal_(mean=0.0,std=std)
-            module.bias.data.zero_()
-    
 
 class GptOssModel(nn.Module):
     def __init__(self,
@@ -453,6 +420,20 @@ class GptOssModel(nn.Module):
                 use_cache=None,
                 cache_position=None,
                 **kwargs):
+        """"
+        Apply the GPT-OSS model to the input data.
+        Args:
+            input_ids (torch.Tensor): Input token IDs of shape (batch_size, sequence_length).
+            attention_mask (torch.Tensor): Attention mask of shape (batch_size, 1, sequence_length, sequence_length).
+            position_ids (torch.Tensor): Position IDs of shape (batch_size, sequence_length).
+            past_key_values (Optional): Past key values for caching.
+            inputs_embeds (Optional): Input embeddings of shape (batch_size, sequence_length, hidden_size).
+            use_cache (bool): Whether to use caching for faster inference.
+            cache_position (Optional): Position in the cache for the current sequence.
+        Returns:
+            MoeModelOutputWithPast: Output of the model containing the last hidden state and past key values.   
+        """
+
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
@@ -511,6 +492,24 @@ class GPTOssModelFull(nn.Module):
                 cache_position=None,
                 logits_to_keep=None,
                 **kwargs):
+        
+        """"
+        Apply the GPT-OSS model to the input data and compute the logits.
+        Args:
+            input_ids (torch.Tensor): Input token IDs of shape (batch_size, sequence_length).
+            attention_mask (torch.Tensor): Attention mask of shape (batch_size, 1, sequence_length, sequence_length).
+            position_ids (torch.Tensor): Position IDs of shape (batch_size, sequence_length).
+            past_key_values (Optional): Past key values for caching.
+            input_embeds (Optional): Input embeddings of shape (batch_size, sequence_length, hidden_size).
+            labels (Optional): Labels for computing the loss.
+            use_cache (bool): Whether to use caching for faster inference.
+            output_router_logits (Optional): Whether to output router logits.
+            cache_position (Optional): Position in the cache for the current sequence.
+            logits_to_keep (Optional): Indices of the logits to keep.
+        Returns:
+            torch.Tensor: Logits of shape (batch_size, sequence_length, vocab_size).
+        """
+
         output_router_logits = (
             output_router_logits if output_router_logits is not None else self.config.output_router_logits
         )
