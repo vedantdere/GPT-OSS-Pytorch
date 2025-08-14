@@ -1,10 +1,8 @@
 from torch import nn # Very Important in Deep Learning :)
 import torch
 from torch.nn import functional as F
-from typing import Callable
 from attn_implementation import eager_paged_attention_forward
 from transformers.modeling_outputs import MoeModelOutputWithPast # Handles the models output. 
-from gpt_config import GptOssConfig
 from transformers.modeling_rope_utils import ROPE_INIT_FUNCTIONS # We are plaining to create separate pure pytorch implementation for rope 
 
 
@@ -308,14 +306,6 @@ class GptOssAttention(nn.Module):
 
         cos,sin = position_embeddings
         query_states , key_states = apply_rotart_pos_emb(query_states,key_states,cos,sin)
-
-        # if past_key_values is not None:
-        #     cache_kwargs = {"cache_position":cache_position}
-        #     key_state,value_states = past_key_values.update(key_state,value_states,self.layer_idx,cache_kwargs)
-
-        attention_inference: Callable = eager_attention_forward
-        # if self.config._attn_implementation != "eager":
-        #     # attention_inference = ALL_ATTENTION_FUNCTION[self.config._attn_implementation]
         attention_inference = eager_paged_attention_forward
 
         attn_output,attn_weights = attention_inference(
