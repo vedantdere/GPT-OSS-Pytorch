@@ -241,7 +241,7 @@ class GptOssAttention(nn.Module):
         self.layer_idx = layer_idx
         
         self.head_dim = getattr(config,"head_dim",config.hidden_size//config.num_attention_heads)
-        print(self.config)
+        
         self.num_key_value_groups = config.num_attention_heads // config.num_key_value_heads
         self.scaling = self.head_dim*-0.5
 
