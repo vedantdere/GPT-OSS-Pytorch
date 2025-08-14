@@ -60,19 +60,20 @@ import torch
 from gpt_config import GptOssConfig
 from gpt_oss import GPTOssModelFull  # your main file
 
-# 1. Create a config
+# 1. Load Config
 config = GptOssConfig()
 
+# 2. Load Model
 model = GPTOssModelFull(config)
 
-# Testing tensors
+# 3. Define Inputs
 batch_size = 2
 seq_len = 1024
 input_ids = torch.randint(0, config.vocab_size, (batch_size, seq_len))
 attention_mask = torch.ones(batch_size, 1, seq_len, seq_len)
 position_ids = torch.arange(seq_len).unsqueeze(0).repeat(batch_size, 1)  # shape: [batch_size, seq_len]
 
-# Run forward pass
+# 4. Run forward pass
 logits = model(input_ids=input_ids, attention_mask=attention_mask,position_ids=position_ids,use_cache=False)
 
 print("Input IDs shape:", input_ids.shape)
