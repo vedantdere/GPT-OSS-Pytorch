@@ -108,6 +108,11 @@ for step in range(100):
 * [ ] Training Support Purely in Pytorch [SFT,PPO,GRPO]
 ---
 
+## 🙏 Credits
+* Special thanks to the Hugging Face Transformers team for their exceptional open-source work. This Reimplementation is primarily inspired by Hugging Face Transformers integration but presented in a much simpler, more beginner-friendly way for easier understanding.
+
+
+---
 
 ## 🤝 Contributing
 
