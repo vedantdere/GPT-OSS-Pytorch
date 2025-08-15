@@ -1,5 +1,8 @@
 # 🚀 GPT-OSS – Pure PyTorch Reimplementation
 
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1sDJUWJNbdxZoMGGoY7YTWwLyE0L8lGon?usp=sharing)
+
+
 <p align="center">
   <img src="https://img.shields.io/badge/PyTorch-2.x-red?style=for-the-badge&logo=pytorch" />
   <img src="https://img.shields.io/badge/Python-3.9+-blue?style=for-the-badge&logo=python" />
@@ -48,7 +51,6 @@ Without Inheriting from anything other than `nn.Module` 😁
 ```bash
 git clone https://github.com/yourusername/gpt-oss.git
 cd gpt-oss
-pip install -r requirements.txt
 ```
 
 ---
@@ -67,17 +69,17 @@ We provide three predefined model configurations:
 ```python
 import torch
 from config import GPTOss_Small
-from gpt_oss import GPTOssModelFull  # your main file
+from layers import GPTOssModelFull  # your main file
 
 # 1. Load Config
-config = GptOssConfig()
+config = GPTOss_Small()
 
 # 2. Load Model
 model = GPTOssModelFull(config)
 
 # 3. Define Inputs
 batch_size = 2
-seq_len = 1024
+seq_len = 5 # for small model testing
 input_ids = torch.randint(0, config.vocab_size, (batch_size, seq_len))
 attention_mask = torch.ones(batch_size, 1, seq_len, seq_len)
 position_ids = torch.arange(seq_len).unsqueeze(0).repeat(batch_size, 1)  # shape: [batch_size, seq_len]
