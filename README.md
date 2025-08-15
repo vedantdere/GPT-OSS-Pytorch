@@ -50,7 +50,7 @@ Without Inheriting from anything other than `nn.Module` 😁
 
 ```bash
 git clone https://github.com/vedantdere/GPT-OSS-Pytorch.git
-cd gpt-oss
+cd GPT-OSS-Pytorch
 ```
 
 ---
