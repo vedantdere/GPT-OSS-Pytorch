@@ -30,8 +30,8 @@ def eager_paged_attention_forward(
     if cache is not None:
         key, value = cache.update(key, value, module.layer_idx, **kwargs)
 
-    key_states = repeat_kv(key, module.num_key_value_groups)
-    value_states = repeat_kv(value, module.num_key_value_groups)
+    key_states= key
+    value_states = value
 
     attn_weights = torch.matmul(query, key_states.transpose(2, 3)) * scaling
     if attention_mask is not None:
@@ -43,3 +43,5 @@ def eager_paged_attention_forward(
     attn_output = attn_output.transpose(1, 2).contiguous()
 
     return attn_output, attn_weights
+
+
