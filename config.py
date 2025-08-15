@@ -123,7 +123,7 @@ class GPTOss_120B(PretrainedConfig):
         self.hidden_size=2880
         self.initial_context_length=4096
         self.initializer_range=0.02
-        self.intermiediate_size=2880
+        self.intermediate_size=2880
         self.num_hidden_layers=36
 
         self.layer_types = [
@@ -168,7 +168,7 @@ class GPTOss_20B(PretrainedConfig):
         self.hidden_size=2880
         self.initial_context_length=4096
         self.initializer_range=0.02
-        self.intermiediate_size=2880
+        self.intermediate_size=2880
         self.num_hidden_layers=24
         self.layer_types = [
             "sliding_attention" if bool((i+1)%2) else "full_attention" for i in range(self.num_hidden_layers)
