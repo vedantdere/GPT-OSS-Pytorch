@@ -49,7 +49,7 @@ Without Inheriting from anything other than `nn.Module` 😁
 ## 📦 Installation
 
 ```bash
-git clone https://github.com/yourusername/gpt-oss.git
+git clone https://github.com/vedantdere/GPT-OSS-Pytorch.git
 cd gpt-oss
 ```
 
