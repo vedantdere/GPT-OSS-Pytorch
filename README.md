@@ -52,12 +52,21 @@ pip install -r requirements.txt
 ```
 
 ---
+## Model Configurations
+
+We provide three predefined model configurations:
+
+1. **gpt-oss-20b** – 20B parameter variant (`GPTOss_120B`)
+2. **gpt-oss-120b** – 120B parameter variant (`GPTOss_20B`)
+3. **gpt-oss-small** – A lightweight version with a reduced number of hidden layers (`GPTOss_Small`)
+
+---
 
 ## 🚀 Quick Start
 
 ```python
 import torch
-from gpt_config import GptOssConfig
+from config import GPTOss_Small
 from gpt_oss import GPTOssModelFull  # your main file
 
 # 1. Load Config
@@ -113,6 +122,7 @@ for step in range(100):
 ## 🛠️ Roadmap
 
 * [ ] Training Support Purely in Pytorch [SFT,PPO,GRPO]
+* [ ] CPU Offloading  
 ---
 
 ## 🙏 Credits
