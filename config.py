@@ -118,6 +118,7 @@ class GPTOss_120B(PretrainedConfig):
         self.eos_token_id=200002
         self.experts_per_tok=4
         self.head_dim=64
+        self.intermediate_size=2880
         self.hidden_act='silu'
         self.hidden_size=2880
         self.initial_context_length=4096
@@ -161,6 +162,7 @@ class GPTOss_20B(PretrainedConfig):
         self.attention_dropout=0.0
         self.eos_token_id=200002
         self.experts_per_tok=4
+        self.intermediate_size=2880
         self.head_dim=64
         self.hidden_act='silu'
         self.hidden_size=2880
