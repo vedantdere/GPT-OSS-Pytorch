@@ -111,6 +111,91 @@ class Config(PretrainedConfig):
         self.use_cache=use_cache
 
 
+class GPTOss_120B(PretrainedConfig):
+    def __init__(self):
+        self.attention_bias=True
+        self.attention_dropout=0.0
+        self.eos_token_id=200002
+        self.experts_per_tok=4
+        self.head_dim=64
+        self.hidden_act='silu'
+        self.hidden_size=2880
+        self.initial_context_length=4096
+        self.initializer_range=0.02
+        self.intermiediate_size=2880
+        self.num_hidden_layers=36
+
+        self.layer_types = [
+            "sliding_attention" if bool((i+1)%2) else "full_attention" for i in range(self.num_hidden_layers)
+        ]
+        self.max_position_embeddings=131072
+        self.model_type="gpt_oss_120b"
+        self.num_attention_heads=64
+        
+        self.num_experts_per_tok=4
+        self.num_key_value_heads=8
+        self.num_local_experts=128
+        self.output_router_logits=False
+        self.pad_token_id=199999
+        self.rms_norm_eps=1e-5
+        self.rope_scaling={
+            "rope_type":"yarn",
+            "factor":32.0,
+            "beta_fast":32.0,
+            "beta_slow":1.0,
+            "truncate":False
+        }
+
+        self.rope_theta=150000.0
+        self.router_aux_loss_coef=0.9
+        self.sliding_window=128
+        self.swiglu_limit=7.0
+        self.tie_word_embeddings=False
+        self.use_cache=False
+        self.vocab_size=201088
+
+
+class GPTOss_20B(PretrainedConfig):
+    def __init__(self):
+        self.attention_bias=True
+        self.attention_dropout=0.0
+        self.eos_token_id=200002
+        self.experts_per_tok=4
+        self.head_dim=64
+        self.hidden_act='silu'
+        self.hidden_size=2880
+        self.initial_context_length=4096
+        self.initializer_range=0.02
+        self.intermiediate_size=2880
+        self.num_hidden_layers=24
+        self.layer_types = [
+            "sliding_attention" if bool((i+1)%2) else "full_attention" for i in range(self.num_hidden_layers)
+        ]
+        self.max_position_embeddings=131072
+        self.model_type="gpt_oss_20b"
+        self.num_attention_heads=64
+        self.num_experts_per_tok=4
+        self.num_key_value_heads=8
+        self.num_local_experts=32
+        self.output_router_logits=False
+        self.pad_token_id=199999
+        self.rms_norm_eps=1e-5
+        self.rope_scaling={
+            "rope_type":"yarn",
+            "factor":32.0,
+            "beta_fast":32.0,
+            "beta_slow":1.0,
+            "truncate":False
+        }
+
+        self.rope_theta=150000.0
+        self.router_aux_loss_coef=0.9
+        self.sliding_window=128
+        self.swiglu_limit=7.0
+        self.tie_word_embeddings=False
+        self.use_cache=False
+        self.vocab_size=201088
+
 class SmallConfig(PretrainedConfig):
     def __init__(self,
                  num_hidden_layers=36,
